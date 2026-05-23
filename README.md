@@ -14,7 +14,7 @@ Cloudflare Worker 版本的 OCI ARM 实例自动创建工具。每分钟通过 C
 - ✅ 使用 OCI REST API（无需 SDK）
 - ✅ 完整的 RSA-SHA256 签名认证
 - ✅ 容量不足时静默重试，成功时发送通知
-- ✅ 详细的日志输出便于调试
+- ✅ 最小化日志输出，避免泄露私钥或签名片段
 
 ## 快速开始
 
@@ -94,7 +94,7 @@ npm run deploy
 npm run tail
 ```
 
-或访问 Worker URL 手动触发测试。
+访问 Worker URL 只会返回健康检查结果；创建实例仅由 Cron 触发。
 
 ## 配置说明
 
@@ -171,22 +171,21 @@ npm run tail
 
 ### 日志内容
 
-- 环境变量验证
-- 私钥格式检测
-- 现有实例列表
-- 资源限额检查
-- API 请求和响应
-- 签名生成过程
+- 创建成功通知
+- 容量不足时等待下次 Cron 的提示
+- 顶层错误信息
 
 ## 故障排查
 
 ### 私钥格式错误
 
-运行检查脚本：
+检查私钥第一行：
 
 ```bash
-npm run check-key oci_private_key.pem
+head -1 oci_private_key.pem
 ```
+
+`-----BEGIN PRIVATE KEY-----` 是 PKCS#8 格式，可以直接使用；`-----BEGIN RSA PRIVATE KEY-----` 需要先转换。
 
 ### 认证失败（401）
 
@@ -239,9 +238,7 @@ oci_auto/
 ├── src/
 │   └── index.ts           # Worker 主代码
 ├── scripts/
-│   ├── check-private-key.js    # 私钥检查工具
-│   ├── convert-key.sh          # 私钥转换脚本
-│   └── test-oci-auth.js        # 本地认证测试
+│   └── convert-key.sh     # 私钥转换脚本
 ├── wrangler.toml          # Cloudflare Worker 配置
 ├── package.json           # 项目依赖
 ├── tsconfig.json          # TypeScript 配置
@@ -288,4 +285,3 @@ MIT
 - 基于原始 Python 脚本改写
 - 参考 [OCI Python SDK](https://github.com/oracle/oci-python-sdk) 实现签名认证
 - 使用 [Cloudflare Workers](https://workers.cloudflare.com/) 平台
-

@@ -28,7 +28,7 @@ if [ $? -eq 0 ]; then
     echo "📄 Output file: $OUTPUT_FILE"
     echo ""
     echo "Next steps:"
-    echo "1. Verify the key: node scripts/check-private-key.js $OUTPUT_FILE"
+    echo "1. Verify the key format: head -1 $OUTPUT_FILE"
     echo "2. Upload to Cloudflare: cat $OUTPUT_FILE | wrangler secret put OCI_PRIVATE_KEY"
 else
     echo "❌ Conversion failed!"

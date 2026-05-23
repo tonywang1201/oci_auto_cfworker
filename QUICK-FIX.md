@@ -44,28 +44,20 @@ TELEGRAM_BOT_API=123456789:ABCdefGHIjklMNOpqrsTUVwxyz
 TELEGRAM_CHAT_ID=123456789
 ```
 
-### 步骤 2：本地测试认证
+### 步骤 2：校验私钥和 fingerprint
 
 ```bash
-npm run test-auth
+head -1 oci_private_key.pem
+openssl rsa -pubout -outform DER -in oci_private_key.pem | openssl md5 -c
 ```
 
-这会：
-- 检查所有配置是否正确
-- 验证私钥格式
-- 测试 OCI API 认证
-- 列出现有实例
+确认：
+- 私钥第一行是 `-----BEGIN PRIVATE KEY-----`
+- fingerprint 输出与你的 `OCI_FINGERPRINT` 完全一致
 
-如果测试成功，你会看到：
-```
-✅ Authentication successful!
-📦 Found X instance(s):
-  - instance-name (VM.Standard.A1.Flex) - RUNNING
-```
+### 步骤 3：根据检查结果修复
 
-### 步骤 3：根据测试结果修复
-
-#### 如果显示 "RSA format detected"
+#### 如果第一行是 `-----BEGIN RSA PRIVATE KEY-----`
 
 你的私钥需要转换：
 
@@ -75,12 +67,12 @@ bash scripts/convert-key.sh oci_private_key.pem
 
 然后更新 `.dev.vars` 中的 `OCI_PRIVATE_KEY`，使用 `oci_private_key_pkcs8.pem` 的内容。
 
-再次测试：
+再次检查：
 ```bash
-npm run test-auth
+head -1 oci_private_key_pkcs8.pem
 ```
 
-#### 如果显示 "Authentication failed"
+#### 如果仍然是 401 认证失败
 
 检查这些值是否正确：
 
@@ -130,7 +122,7 @@ npm run deploy
 npm run tail
 ```
 
-等待 1 分钟看 Cron 触发，或者访问你的 Worker URL 手动触发。
+等待 1 分钟看 Cron 触发。访问 Worker URL 只会返回健康检查结果，不会触发创建实例。
 
 ## 常见问题
 
@@ -178,19 +170,21 @@ bash scripts/convert-key.sh oci_private_key.pem
 
 ## 调试技巧
 
-### 查看详细日志
+### 查看运行日志
 
 部署后查看实时日志：
 ```bash
 wrangler tail --format pretty
 ```
 
-### 手动触发测试
+### 健康检查
 
-访问你的 Worker URL（不要等 Cron）：
+访问你的 Worker URL：
 ```
 https://oci-auto-worker.your-subdomain.workers.dev
 ```
+
+它只应返回健康检查 JSON；创建实例仅由 Cron 触发。
 
 ### 验证 Secrets 已设置
 
@@ -213,7 +207,7 @@ python oci_auto.py
 
 如果以上步骤都试过了还是不行，请提供：
 
-1. `npm run test-auth` 的完整输出
+1. `head -1 oci_private_key.pem` 的输出（不要分享私钥内容）
 2. `npm run tail` 的完整错误日志
 3. 确认原始 Python 脚本是否能正常工作
 

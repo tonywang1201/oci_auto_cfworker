@@ -38,24 +38,9 @@ export default {
   },
 
   async fetch(request: Request, env: Env): Promise<Response> {
-    if (request.method === 'GET') {
-      try {
-        const result = await createOCIInstance(env);
-        return new Response(JSON.stringify({ success: true, result }, null, 2), {
-          headers: { 'Content-Type': 'application/json' }
-        });
-      } catch (error) {
-        return new Response(JSON.stringify({ 
-          success: false,
-          error: error instanceof Error ? error.message : String(error)
-        }, null, 2), {
-          status: 500,
-          headers: { 'Content-Type': 'application/json' }
-        });
-      }
-    }
-    
-    return new Response('OCI Auto-Creation Worker is running.', { status: 200 });
+    return new Response(JSON.stringify({ ok: true, mode: 'cron-only' }, null, 2), {
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 };
 
@@ -255,108 +240,71 @@ async function makeOCIRequest(
 }
 
 async function signRequest(privateKeyPem: string, signingString: string): Promise<string> {
-  console.log('\n>>> Starting signature generation');
-  
-  try {
-    // Clean the private key
-    let cleanedKey = privateKeyPem.trim();
-    
-    console.log(`Private key raw length: ${privateKeyPem.length} chars`);
-    console.log(`Private key starts with: ${privateKeyPem.substring(0, 30)}...`);
-    
-    // Check if it's already clean base64 (no headers)
-    const hasHeaders = cleanedKey.includes('-----BEGIN');
-    console.log(`Has PEM headers: ${hasHeaders}`);
-    
-    if (hasHeaders) {
-      // Detect key type
-      if (cleanedKey.includes('-----BEGIN RSA PRIVATE KEY-----')) {
-        throw new Error('❌ Private key is in RSA format! Must be PKCS#8 format (BEGIN PRIVATE KEY). Use: wrangler secret delete OCI_PRIVATE_KEY, then convert key and re-upload.');
-      }
-      
-      if (cleanedKey.includes('ENCRYPTED')) {
-        throw new Error('❌ Private key is encrypted! Must be unencrypted. Decrypt it first.');
-      }
-      
-      // Remove PEM headers, footers, and all whitespace
-      cleanedKey = cleanedKey
-        .replace(/-----BEGIN[^-]+-----/g, '')
-        .replace(/-----END[^-]+-----/g, '')
-        .replace(/\r/g, '')
-        .replace(/\n/g, '')
-        .replace(/\s/g, '')
-        .trim();
-    } else {
-      // Already clean, just remove whitespace
-      cleanedKey = cleanedKey.replace(/\s/g, '');
+  let cleanedKey = privateKeyPem.trim();
+
+  // Check if it's already clean base64 (no headers)
+  const hasHeaders = cleanedKey.includes('-----BEGIN');
+
+  if (hasHeaders) {
+    // Detect key type
+    if (cleanedKey.includes('-----BEGIN RSA PRIVATE KEY-----')) {
+      throw new Error('❌ Private key is in RSA format! Must be PKCS#8 format (BEGIN PRIVATE KEY). Use: wrangler secret delete OCI_PRIVATE_KEY, then convert key and re-upload.');
     }
-    
-    console.log(`Cleaned base64 length: ${cleanedKey.length} chars`);
-    console.log(`First 50 chars: ${cleanedKey.substring(0, 50)}`);
-    console.log(`Last 50 chars: ${cleanedKey.substring(cleanedKey.length - 50)}`);
-    
-    // Validate base64 content
-    if (!/^[A-Za-z0-9+/]*={0,2}$/.test(cleanedKey)) {
-      const invalidChars = cleanedKey.match(/[^A-Za-z0-9+/=]/g);
-      const uniqueInvalid = invalidChars ? [...new Set(invalidChars)] : [];
-      throw new Error(`❌ Invalid base64 characters found: ${uniqueInvalid.join(', ')}`);
+
+    if (cleanedKey.includes('ENCRYPTED')) {
+      throw new Error('❌ Private key is encrypted! Must be unencrypted. Decrypt it first.');
     }
-    console.log('✅ Base64 validation passed');
-    
-    // Decode base64 to binary
-    console.log('Decoding base64...');
-    const binaryDer = Uint8Array.from(atob(cleanedKey), c => c.charCodeAt(0));
-    console.log(`✅ Decoded to ${binaryDer.length} bytes`);
-    
-    // Import the private key (PKCS#8 format required)
-    console.log('Importing private key...');
-    let privateKey;
-    try {
-      privateKey = await crypto.subtle.importKey(
-        'pkcs8',
-        binaryDer,
-        {
-          name: 'RSASSA-PKCS1-v1_5',
-          hash: 'SHA-256'
-        },
-        false,
-        ['sign']
-      );
-      console.log('✅ Private key imported successfully');
-    } catch (importError) {
-      console.error('❌ Failed to import private key:', importError);
-      throw new Error(`Private key import failed. Ensure it's PKCS#8 format (BEGIN PRIVATE KEY). Error: ${importError}`);
-    }
-    
-    // Sign the string
-    console.log('Generating signature...');
-    const signatureBytes = await crypto.subtle.sign(
-      'RSASSA-PKCS1-v1_5',
-      privateKey,
-      new TextEncoder().encode(signingString)
-    );
-    
-    // Convert to base64
-    const signature = btoa(String.fromCharCode(...new Uint8Array(signatureBytes)));
-    console.log(`✅ Signature generated: ${signature.length} chars`);
-    console.log(`Signature preview: ${signature.substring(0, 50)}...`);
-    console.log('<<< Signature generation complete\n');
-    
-    return signature;
-  } catch (error) {
-    console.error('\n❌ ERROR in signRequest:');
-    console.error(error);
-    
-    if (error instanceof Error) {
-      if (error.message.includes('atob')) {
-        console.error('\n💡 Hint: The private key has invalid base64 encoding.');
-        console.error('   Make sure you uploaded the complete PEM file content.');
-        console.error('   Command: cat oci_private_key.pem | wrangler secret put OCI_PRIVATE_KEY');
-      }
-    }
-    
-    throw error;
+
+    // Remove PEM headers, footers, and all whitespace
+    cleanedKey = cleanedKey
+      .replace(/-----BEGIN[^-]+-----/g, '')
+      .replace(/-----END[^-]+-----/g, '')
+      .replace(/\r/g, '')
+      .replace(/\n/g, '')
+      .replace(/\s/g, '')
+      .trim();
+  } else {
+    // Already clean, just remove whitespace
+    cleanedKey = cleanedKey.replace(/\s/g, '');
   }
+
+  // Validate base64 content
+  if (!/^[A-Za-z0-9+/]*={0,2}$/.test(cleanedKey)) {
+    const invalidChars = cleanedKey.match(/[^A-Za-z0-9+/=]/g);
+    const uniqueInvalid = invalidChars ? [...new Set(invalidChars)] : [];
+    throw new Error(`❌ Invalid base64 characters found: ${uniqueInvalid.join(', ')}`);
+  }
+
+  let binaryDer: Uint8Array;
+  try {
+    binaryDer = Uint8Array.from(atob(cleanedKey), c => c.charCodeAt(0));
+  } catch {
+    throw new Error('Private key has invalid base64 encoding. Make sure you uploaded the complete PEM file content.');
+  }
+
+  let privateKey;
+  try {
+    privateKey = await crypto.subtle.importKey(
+      'pkcs8',
+      binaryDer,
+      {
+        name: 'RSASSA-PKCS1-v1_5',
+        hash: 'SHA-256'
+      },
+      false,
+      ['sign']
+    );
+  } catch {
+    throw new Error('Private key import failed. Ensure it is PKCS#8 format (BEGIN PRIVATE KEY).');
+  }
+
+  const signatureBytes = await crypto.subtle.sign(
+    'RSASSA-PKCS1-v1_5',
+    privateKey,
+    new TextEncoder().encode(signingString)
+  );
+
+  return btoa(String.fromCharCode(...new Uint8Array(signatureBytes)));
 }
 
 async function sendTelegramMessage(env: Env, message: string): Promise<void> {

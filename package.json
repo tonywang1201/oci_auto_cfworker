@@ -7,9 +7,7 @@
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "tail": "wrangler tail",
-    "check-key": "node scripts/check-private-key.js",
-    "convert-key": "bash scripts/convert-key.sh",
-    "test-auth": "node scripts/test-oci-auth.js"
+    "convert-key": "bash scripts/convert-key.sh"
   },
   "keywords": ["cloudflare", "worker", "oci", "oracle-cloud"],
   "author": "",

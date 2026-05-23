@@ -7,14 +7,11 @@
 ### 步骤 1：检查私钥格式
 
 ```bash
-node scripts/check-private-key.js oci_private_key.pem
+head -1 oci_private_key.pem
+grep ENCRYPTED oci_private_key.pem
 ```
 
-这会显示：
-- 私钥格式（PKCS#8 还是 RSA）
-- 是否加密
-- Base64 内容是否有效
-- 具体的修复建议
+第一行应为 `-----BEGIN PRIVATE KEY-----`。如果是 `-----BEGIN RSA PRIVATE KEY-----`，需要转换为 PKCS#8；如果包含 `ENCRYPTED`，需要先解密。
 
 ### 步骤 2：根据检查结果修复
 
@@ -70,7 +67,7 @@ cat oci_private_key.pem | wrangler secret put OCI_PRIVATE_KEY
 npm run deploy
 ```
 
-访问你的 Worker URL 或查看日志：
+查看日志并等待 Cron 触发。访问 Worker URL 只会返回健康检查结果，不会触发创建实例：
 
 ```bash
 npm run tail
@@ -155,9 +152,9 @@ npm run tail
 wrangler tail --format pretty
 ```
 
-### 2. 手动触发测试
+### 2. 健康检查
 
-访问你的 Worker URL（例如 `https://oci-auto-worker.your-subdomain.workers.dev`）
+访问你的 Worker URL（例如 `https://oci-auto-worker.your-subdomain.workers.dev`）。它只应返回健康检查 JSON；创建实例仅由 Cron 触发。
 
 ### 3. 查看已设置的 Secrets
 
@@ -182,8 +179,8 @@ wrangler secret delete SECRET_NAME
 如果一切都不工作，从头开始：
 
 ```bash
-# 1. 检查私钥
-node scripts/check-private-key.js oci_private_key.pem
+# 1. 检查私钥格式
+head -1 oci_private_key.pem
 
 # 2. 如果需要，转换私钥
 bash scripts/convert-key.sh oci_private_key.pem
@@ -209,6 +206,6 @@ npm run tail
 
 如果以上方法都不能解决问题：
 
-1. 运行 `node scripts/check-private-key.js oci_private_key.pem` 并分享输出
+1. 分享 `head -1 oci_private_key.pem` 的输出（不要分享私钥内容）
 2. 运行 `wrangler tail` 并分享完整的错误日志
 3. 确认你的 OCI 配置在原始 Python 脚本中是否能正常工作

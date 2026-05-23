@@ -48,7 +48,7 @@ cp .dev.vars.example .dev.vars
 npm run dev
 ```
 
-访问 `http://localhost:8787` 测试。
+访问 `http://localhost:8787` 只会返回健康检查结果；创建实例仅由 Cron 触发。
 
 ### 5. 登录 Cloudflare
 
@@ -112,8 +112,8 @@ https://oci-auto-worker.your-subdomain.workers.dev
 
 ### 9. 验证部署
 
-#### 方法 1: 手动触发
-访问你的 Worker URL，会立即执行一次创建尝试。
+#### 方法 1: 健康检查
+访问你的 Worker URL，只应看到健康检查 JSON，不会触发创建实例。
 
 #### 方法 2: 查看日志
 ```bash
